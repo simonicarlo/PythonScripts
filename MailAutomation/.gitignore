@@ -1,7 +1,7 @@
 # Ignore .env file
 .env
 
-# Ignore all messages (.txt files)
+# Ignore all messages and the last_uid file (.txt files)
 *.txt
 
 # Ignore all .log files

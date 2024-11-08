@@ -17,7 +17,9 @@ IMAP_SERVER = os.getenv("IMAP_SERVER")
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 UID_FILE = "last_uid.txt"
 
-1
+AUTOREPLY_FILE = "autoreply1.txt"
+AUTOREPLY_SUBJECT = "Danke für deine Email!"
+
 # SQLite setup for storing emails
 conn = sqlite3.connect('emails.db')
 cursor = conn.cursor()
@@ -42,11 +44,11 @@ def send_automated_reply(sender_email):
         smtp.login(EMAIL, PASSWORD)
 
         # Create a reply message from a file
-        with open("autoreply1.txt", "r") as file:
+        with open(AUTOREPLY_FILE, "r") as file:
             reply_message = file.read()
 
         msg = MIMEText(reply_message)
-        msg["Subject"] = "Danke für deine Email!"
+        msg["Subject"] = AUTOREPLY_SUBJECT
         msg["From"] = EMAIL
         msg["To"] = sender_email
 
@@ -198,8 +200,8 @@ def send_to_subset():
                 msg = MIMEText(file.read())
        
         
-        message = input("Enter the subject of the email: ")
-        msg["Subject"] = input
+        subject = input("Enter the subject of the email: ")
+        msg["Subject"] = subject
         msg["From"] = EMAIL
 
         for email in selected_emails:    
