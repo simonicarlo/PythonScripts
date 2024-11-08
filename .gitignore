@@ -1,0 +1,11 @@
+# Ignore .env file
+.env
+
+# Ignore all messages (.txt files)
+*.txt
+
+# Ignore all .log files
+*.log
+
+# Ignore the database file
+*.db
