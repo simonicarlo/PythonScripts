@@ -10,7 +10,8 @@ import random
 import logging
 
 
-# Email and IMAP Configuration
+
+# Load environment variables
 load_dotenv()
 
 # Mode of Operation
@@ -18,7 +19,7 @@ load_dotenv()
 # 1: Manual Mode - CLI for processing emails
 # 2: Automated Mode - Process new emails and send automated replies (setup in cron job)
 
-MODE = 0
+MODE = 1
 MODE_DESCRIPTION = {0: "Development", 1: "Manual", 2: "Automated"}
 current_mode = MODE_DESCRIPTION.get(MODE, "Unknown")
 
@@ -36,15 +37,14 @@ logging.basicConfig(
 )
 
 # Automated Reply Configuration
-AUTOREPLY_FILE = "autoreply1.txt"
+AUTOREPLY_FILE = os.path.join(os.path.dirname(__file__), "autoreply1.txt")
 AUTOREPLY_SUBJECT = "Danke für deine Email!"
 
-# Email Configuration
+# Email and IMAP Configuration
 EMAIL = os.getenv("EMAIL")
 PASSWORD = os.getenv("PASSWORD")
 IMAP_SERVER = os.getenv("IMAP_SERVER")
 SMTP_SERVER = os.getenv("SMTP_SERVER")
-
 
 # Database Configuration
 # SQLite setup for storing emails
@@ -86,7 +86,7 @@ def get_last_uid():
     if os.path.exists(UID_FILE):
         with open(UID_FILE, 'r') as file:
             return file.read().strip()
-    return None
+    return -1
 
 # Function to save last UID
 def save_last_uid(uid):
@@ -94,12 +94,39 @@ def save_last_uid(uid):
         file.write(uid)
     log_info(f"Last UID saved as {uid}")
 
+def view_new_emails():
+    with imaplib.IMAP4_SSL(IMAP_SERVER) as imap:
+        imap.login(EMAIL, PASSWORD)
+        imap.select("inbox")
+
+        last_uid = get_last_uid()
+        next_uid = int(last_uid) + 1 if last_uid else 1
+
+        search_criteria = f'UID {next_uid}:*' if last_uid else 'ALL'
+        status, messages = imap.uid('search', None, search_criteria)
+        uids = messages[0].split()
+        if uids[0].decode('utf-8') == last_uid:
+            print("No new emails.")
+            return
+
+        print(f"{'UID':<7} {'From':<50} {'Subject'}")
+        print("="*100)
+
+        for uid in uids:
+            status, msg_data = imap.uid('fetch', uid, '(RFC822)')
+            for returned_mail in msg_data:
+                if isinstance(returned_mail, tuple):
+                    msg = email.message_from_bytes(returned_mail[1]) # returned_mail[0] is just the UID
+                    subject = msg["Subject"]
+                    sender = msg["From"]
+                    print(f"{uid.decode('utf-8'):<7} {sender:<50} {subject}")
+
 # Send automated reply
 def send_automated_reply(sender_email):
 
     if not os.path.exists(AUTOREPLY_FILE):
         log_error(f"Automated reply file {AUTOREPLY_FILE} not found.")
-        return
+        raise FileNotFoundError("Automated reply file not found.")
 
     with smtplib.SMTP(SMTP_SERVER, 587) as smtp:
         smtp.starttls()
@@ -218,9 +245,12 @@ def process_new_emails():
                     conn.commit()
                     log_info(f"New email processed from {sender_email} (UID: {uid.decode('utf-8')})")
 
-                    # Send automated reply 
-                    send_automated_reply(sender_email)
-
+                    # Send automated reply
+                    try:
+                        send_automated_reply(sender_email)
+                    except FileNotFoundError as e:
+                        return
+                    
             # Update the last processed UID
             save_last_uid(uid.decode('utf-8'))
         
@@ -338,66 +368,70 @@ def send_to_subset():
 
 
 def main(rec = False):
-    try:
-        if MODE == 2:
-            process_new_emails()
-            return
+    if MODE == 2:
+        process_new_emails()
+        return
+    
+    if not rec:
+        color_print("\n--------------- Welcome to AutoMailtion ---------------\n",Color.PURPLE)
+        if MODE == 0: 
+            color_print("Running in Development Mode",Color.YELLOW)
+    
+    while True:
+        color_print("\nPlease select an option:\n",Color.CYAN)
+        print(f"\tTo {color_text('process new emails',Color.CYAN)} please enter {color_text('1',Color.GREEN)}")
+        print(f"\tTo {color_text('view stored emails',Color.CYAN)} please enter {color_text('2',Color.GREEN)}")
+        print(f"\tTo {color_text('send to a subset',Color.CYAN)} of stored mail addresses please enter {color_text('3',Color.GREEN)}")
+        print(f"\tTo {color_text('delete',Color.CYAN)} an email please enter {color_text('4',Color.GREEN)}")
+        print(f"\tTo {color_text('delete all',Color.CYAN)} emails please enter {color_text('5',Color.GREEN)}")
+        print(f"\tTo {color_text('add',Color.CYAN)} an email please enter {color_text('6',Color.GREEN)}")
+        print(f"\tTo {color_text('view new emails',Color.CYAN)} please enter {color_text('7',Color.GREEN)}")
+        print(f"\tTo {color_text('update last UID',Color.CYAN)} please enter {color_text('8',Color.GREEN)}")
+        print(f"\tTo {color_text('exit',Color.CYAN)} the program please enter {color_text('0',Color.GREEN)}")
         
-        if not rec:
-            color_print("\n--------------- Welcome to AutoMailtion ---------------\n",Color.PURPLE)
-            if MODE == 0: 
-                color_print("Running in Development Mode",Color.YELLOW)
-        
-        while True:
-            color_print("\nPlease select an option:\n",Color.CYAN)
-            print(f"\tTo {color_text('process new emails',Color.CYAN)} please enter {color_text('1',Color.GREEN)}")
-            print(f"\tTo {color_text('view stored emails',Color.CYAN)} please enter {color_text('2',Color.GREEN)}")
-            print(f"\tTo {color_text('send to a subset',Color.CYAN)} of stored mail addresses please enter {color_text('3',Color.GREEN)}")
-            print(f"\tTo {color_text('delete',Color.CYAN)} an email please enter {color_text('4',Color.GREEN)}")
-            print(f"\tTo {color_text('delete all',Color.CYAN)} emails please enter {color_text('5',Color.GREEN)}")
-            print(f"\tTo {color_text('add',Color.CYAN)} an email please enter {color_text('6',Color.GREEN)}")
-            print(f"\tTo {color_text('update last UID',Color.CYAN)} please enter {color_text('7',Color.GREEN)}")
-            print(f"\tTo {color_text('exit',Color.CYAN)} the program please enter {color_text('0',Color.GREEN)}")
-            
-            choice = input(color_text("\nEnter your choice: ",Color.GREEN))
+        choice = input(color_text("\nEnter your choice: ",Color.GREEN))
 
-            if choice == '1':
-                process_new_emails()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '2':
-                view_stored_emails()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '3':
-                send_to_subset()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '4':
-                delete_email()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '5':
-                delete_all_emails()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '6':
-                add_email()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '7':
-                update_last_UID()
-                input(color_text("\nPress Enter to continue",Color.CYAN))
-            elif choice == '0':
-                color_print("\n--------------- Exiting program. Goodbye! ---------------",Color.PURPLE)
-                log_info("Program exited.")
-                break
-            else:
-                color_print("\nInvalid choice. Please try again.",Color.YELLOW)
-    except Exception as e:
-        log_error(f"An error occurred: {e}")
-    finally:
-        conn.close()
+        if choice == '1':
+            process_new_emails()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '2':
+            view_stored_emails()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '3':
+            send_to_subset()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '4':
+            delete_email()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '5':
+            delete_all_emails()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '6':
+            add_email()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '7':
+            view_new_emails()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '8':
+            update_last_UID()
+            input(color_text("\nPress Enter to continue",Color.CYAN))
+        elif choice == '0':
+            color_print("\n--------------- Exiting program. Goodbye! ---------------",Color.PURPLE)
+            log_info("Program exited.")
+            break
+        else:
+            color_print("\nInvalid choice. Please try again.",Color.YELLOW)
+
 
 
 
 
 if __name__ == "__main__":
-    main()
-
+    try:
+        main()
+    except Exception as e:
+        log_error(f"An error occurred: {e}")
+    finally:
+        conn.close()
 
     
