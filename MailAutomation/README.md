@@ -1,28 +1,30 @@
 # AutoMailtion
 
-(Disclaimer: This readme was partially written by ChatGPT)
+(Disclaimer: This README was partially written by ChatGPT)
 
 AutoMailtion is a script that automates email replies, manages email lists, and processes incoming emails from an IMAP server. This README provides instructions for setup and usage.
 
 ## Setup
 
 1. **Dependencies:** Ensure you have imaplib, smtplib, sqlite3, and dotenv installed. These are part of Python’s standard library except for dotenv, which can be installed via pip:
+```bash
    pip install python-dotenv
+```
 
-2. **Environment Variables:** Create a .env file in the project directory with the following variables:
-   EMAIL=<your-email@example.com>
-   PASSWORD=<your-email-password>
-   IMAP_SERVER=<your-imap-server>
-   SMTP_SERVER=<your-smtp-server>
 
-3. **Auto-Reply Message and Subject:**
-   Configure the AUTOREPLY_FILE and AUTOREPLY_SUBJECT variables in the script.
-   AUTOREPLY_FILE should contain the path to a text file (e.g., autoreply1.txt) with the content of the automatic reply.
-   AUTOREPLY_SUBJECT is the subject line for the auto-reply email.
+3. **Environment Variables:** Create a .env file in the project directory with the following variables:
+   - EMAIL=\<your-email@example.com>
+   - PASSWORD=\<your-email-password>
+   - IMAP_SERVER=\<your-imap-server>
+   - SMTP_SERVER=\<your-smtp-server>
 
-4. **Initialize Last UID:**
-   The script uses UID_FILE to store the last processed email's UID, ensuring it doesn’t reprocess old emails.
-   You may need to update this UID initially to avoid processing all previous emails. Run the update_last_UID function to set the last UID based on current emails in your inbox.
+4. **Auto-Reply Message and Subject:** Configure the AUTOREPLY_FILE and AUTOREPLY_SUBJECT variables in the script.
+   - AUTOREPLY_FILE should contain the path to a text file (e.g., autoreply1.txt) with the content of the automatic reply.
+   - AUTOREPLY_SUBJECT is the subject line for the auto-reply email.
+
+5. **Initialize Last UID:**
+   - The script uses UID_FILE to store the last processed email's UID, ensuring it doesn’t reprocess old emails.
+   - You may need to update this UID initially to avoid processing all previous emails. Run the update_last_UID function to set the last UID based on current emails in your inbox.
 
 ## Usage
 
