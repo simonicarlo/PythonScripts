@@ -64,14 +64,11 @@ def view_stored_emails():
     for idx, email in enumerate(all_emails):
         print(f"{idx}: {email}")
 
+    return all_emails
+
 def delete_email():
     # Fetch stored emails
-    cursor.execute("SELECT email FROM emails")
-    all_emails = [row[0] for row in cursor.fetchall()]
-    
-    print("Stored Emails:")
-    for idx, email in enumerate(all_emails):
-        print(f"{idx}: {email}")
+    all_emails = view_stored_emails()
     
     # Choose an email to delete
     choice = input("Enter the indices of the email addresses to delete (comma-separated): ")
@@ -100,6 +97,26 @@ def add_email():
     cursor.execute("INSERT OR IGNORE INTO emails (email) VALUES (?)", (email,))
     conn.commit()
     print(f'{email} has been added to the stored emails.')
+
+def update_last_UID():
+    # Fetch UID from Imap
+    with imaplib.IMAP4_SSL(IMAP_SERVER) as imap:
+        imap.login(EMAIL, PASSWORD)
+        imap.select("inbox")
+        status, messages = imap.uid('search', None, 'ALL')
+        uids = messages[0].split()
+        last_uid = uids[-1].decode('utf-8')
+        print(f"Last UID: {last_uid}")
+        print(f"Current last UID: {get_last_uid()}")
+
+        choice = input("Do you want to update the last UID? (Enter 'y' for yes): ")
+        if choice != 'y':
+            print("Last UID not updated.")
+            return
+        
+        save_last_uid(last_uid)
+        print(f"Last UID updated to {last_uid}")
+
 
 # Fetch and process new emails
 def process_new_emails():
@@ -138,12 +155,7 @@ def process_new_emails():
 
 def send_to_subset():
     # Fetch stored emails
-    cursor.execute("SELECT email FROM emails")
-    all_emails = [row[0] for row in cursor.fetchall()]
-    
-    print("Stored Emails:")
-    for idx, email in enumerate(all_emails):
-        print(f"{idx}: {email}")
+    all_emails = view_stored_emails()
     
     # Choose a subset
     print("Please select a subset of emails to send to:")
@@ -155,7 +167,9 @@ def send_to_subset():
     print("\tTo send to the last n emails please enter 5")
     print("\tTo send to a random subset of emails please enter 6")
     print("\tTo exit please enter -1")
+    
     choice = input("Enter your choice: ")
+
     if choice == '0':
         selected_emails = all_emails
     elif choice == '1':
@@ -223,6 +237,7 @@ def main():
         print("\tTo send to a subset of stored mail addresses please enter 3")
         print("\tTo delete an email please enter 4")
         print("\tTo delete all emails please enter 5")
+        print("\tTo update the last UID please enter 6")
         print("\tTo exit the program please enter 0")
         choice = input("Enter your choice: ")
 
@@ -236,6 +251,8 @@ def main():
             delete_email()
         elif choice == '5':
             delete_all_emails()
+        elif choice == '6':
+            update_last_UID()
         elif choice == '0':
             print("Exiting program. Goodbye!")
             break
