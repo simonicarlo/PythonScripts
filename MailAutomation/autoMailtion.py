@@ -8,7 +8,6 @@ import os
 from dotenv import load_dotenv
 import random
 import logging
-import keyboard
 
 
 # Email and IMAP Configuration
@@ -300,8 +299,9 @@ def send_to_subset():
                 break
             elif option == '1':
                 filename = input(color_text("Enter the name of the file to send as the email body (email_body.txt): ",Color.GREEN))
-                with open(filename, "r") as file:
-                    msg = MIMEText(file.read())
+                if not os.path.exists(filename):
+                    log_error(f"File {filename} not found.")
+                    continue
                 break
             else:
                 color_print("\nInvalid choice. Please try again.",Color.YELLOW)
