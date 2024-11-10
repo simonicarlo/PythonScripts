@@ -52,14 +52,31 @@ cursor = conn.cursor()
 cursor.execute("CREATE TABLE IF NOT EXISTS emails (email TEXT UNIQUE)")
 
 
+# ANSI Color Codes for terminal text
+class Color:
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    CYAN = '\033[96m'
+    PURPLE = '\033[95m'
+    END = '\033[0m'
+
+# Add color to string
+def color_text(text, color):
+    return f"{color}{text}{Color.END}"
+
+# Print with color
+def color_print(text, color):
+    print(f"{color}{text}{Color.END}")
+
 # Logging
 def log_info(message):
-    print(message)
+    print("\n" + message)
     if ENABLE_LOGGING:
         logging.info(message, extra={'mode': current_mode})
 
 def log_error(message):
-    print(f'ERROR: {message}')
+    color_print(f'\nERROR: {message}', Color.RED)
     if ENABLE_LOGGING:
         logging.info(message, extra={'mode': current_mode})
 
@@ -97,7 +114,7 @@ def send_automated_reply(sender_email):
         msg["To"] = sender_email
 
         if MODE == 0:
-            print(f"Development Mode: Sending {msg} to {sender_email}")
+            print(f"\nDevelopment Mode - Sending: \n{msg}\n")
         else: 
             smtp.sendmail(EMAIL, sender_email, msg.as_string())
     log_info(f"Sent automated reply to {sender_email}")
@@ -108,9 +125,9 @@ def view_stored_emails():
     cursor.execute("SELECT email FROM emails")
     all_emails = [row[0] for row in cursor.fetchall()]
     
-    print("Stored Emails:")
+    color_print("\nStored Emails:",Color.CYAN)
     for idx, email in enumerate(all_emails):
-        print(f"{idx}: {email}")
+        print(f"{color_text(idx,Color.CYAN)}: {email}")
 
     return all_emails
 
@@ -119,7 +136,7 @@ def delete_email():
     all_emails = view_stored_emails()
     
     # Choose an email to delete
-    choice = input("Enter the indices of the email addresses to delete (comma-separated): ")
+    choice = input(color_text("\nEnter the indices of the email addresses to delete (comma-separated): ",Color.GREEN))
     indices = [int(i) for i in choice.split(',')]
     emails_to_delete = [all_emails[i] for i in indices]
 
@@ -132,7 +149,7 @@ def delete_email():
     log_info(f"{len(emails_to_delete)} emails deleted: {emails_to_delete}")
 
 def delete_all_emails():
-    check = input("Are you sure you want to delete all stored emails? (Enter CONFIRM): ")
+    check = input(color_text("\nAre you sure you want to delete all stored emails? (Enter \"CONFIRM\"): ",Color.RED))
     if check != "CONFIRM":
         print("Deletion cancelled.")
         return
@@ -142,7 +159,7 @@ def delete_all_emails():
     log_info("All stored emails have been deleted.")
 
 def add_email():
-    email = input("Enter the email address to add: ")
+    email = input(color_text("\nEnter the email address to add: ",Color.GREEN))
     cursor.execute("INSERT OR IGNORE INTO emails (email) VALUES (?)", (email,))
     conn.commit()
     log_info(f"{email} added to stored emails.")
@@ -155,10 +172,10 @@ def update_last_UID():
         status, messages = imap.uid('search', None, 'ALL')
         uids = messages[0].split()
         last_uid = uids[-1].decode('utf-8')
-        print(f"Last UID: {last_uid}")
+        print(f"\nLast UID: {last_uid}")
         print(f"Current last UID: {get_last_uid()}")
 
-        choice = input("Do you want to update the last UID? (Enter 'y' for yes): ")
+        choice = input(color_text("\nDo you want to update the last UID? (Enter 'y' for yes): ",Color.GREEN))
         if choice != 'y':
             print("Last UID not updated.")
             return
@@ -175,11 +192,16 @@ def process_new_emails():
         
         # Get the last processed UID
         last_uid = get_last_uid()
-        search_criteria = f'UID {int(last_uid) + 1}:*' if last_uid else 'ALL'
-        
+        next_uid = int(last_uid) + 1 if last_uid else 1
+
+        search_criteria = f'UID {next_uid}:*' if last_uid else 'ALL'
         # Search for new emails
         status, messages = imap.uid('search', None, search_criteria)
         uids = messages[0].split()
+        if uids[0].decode('utf-8') == last_uid:
+            log_info("No new emails to process.")
+            return
+
 
         for uid in uids:
             # Fetch the email by UID§
@@ -193,7 +215,7 @@ def process_new_emails():
                     # Save sender email to database
                     cursor.execute("INSERT OR IGNORE INTO emails (email) VALUES (?)", (sender_email,))
                     conn.commit()
-                    log_info(f"New email processed from {sender_email}")
+                    log_info(f"New email processed from {sender_email} (UID: {uid.decode('utf-8')})")
 
                     # Send automated reply 
                     send_automated_reply(sender_email)
@@ -208,51 +230,59 @@ def send_to_subset():
     all_emails = view_stored_emails()
     
     # Choose a subset
-    print("Please select a subset of emails to send to:")
-    print("\tTo send to all stored emails please enter 0")
-    print("\tTo send to a selection of emails please enter 1")
-    print("\tTo send to all except a selection of emails please enter 2")
-    print("\tTo send to the first n emails please enter 3")
-    print("\tTo sen to all but the first n emails please enter 4")
-    print("\tTo send to the last n emails please enter 5")
-    print("\tTo send to a random subset of emails please enter 6")
-    print("\tTo exit please enter -1")
-    
-    choice = input("Enter your choice: ")
+    while True:
+        color_print("\nPlease select a subset of emails to send to:\n",Color.CYAN)
+        print(f"\tTo send to {color_text('all stored',Color.CYAN)} emails please enter {color_text('1',Color.GREEN)}")
+        print(f"\tTo send to {color_text('a selection',Color.CYAN)} of emails please enter {color_text('2',Color.GREEN)}")
+        print(f"\tTo send to {color_text('all except a selection',Color.CYAN)} of emails please enter {color_text('3',Color.GREEN)}")
+        print(f"\tTo send to the {color_text('first n emails',Color.CYAN)} please enter {color_text('4',Color.GREEN)}")
+        print(f"\tTo send to {color_text('all but the first n emails',Color.CYAN)} please enter {color_text('5',Color.GREEN)}")
+        print(f"\tTo send to the {color_text('last n emails',Color.CYAN)} please enter {color_text('6',Color.GREEN)}")
+        print(f"\tTo send to a {color_text('random subset',Color.CYAN)} of emails please enter {color_text('7',Color.GREEN)}")
+        print(f"\tTo {color_text('exit',Color.CYAN)} please enter 0")
+        
+        choice = input(color_text("\nEnter your choice: ",Color.GREEN))
 
-    if choice == '0':
-        selected_emails = all_emails
-    elif choice == '1':
-        selected = input("Enter indices of emails to send (comma-separated): ")
-        indices = [int(i) for i in selected.split(',')]
-        if any(i >= len(all_emails) or i < 0 for i in indices):
-            log_error("Invalid indices entered.")
+        if choice == '1':
+            selected_emails = all_emails
+            break
+        elif choice == '2':
+            selected = input(color_text("Enter indices of emails to send (comma-separated): ",Color.GREEN))
+            indices = [int(i) for i in selected.split(',')]
+            if any(i >= len(all_emails) or i < 0 for i in indices):
+                log_error("Invalid indices entered.")
+                return
+            selected_emails = [all_emails[i] for i in indices]
+            break
+        elif choice == '3':
+            selected = input(color_text("Enter indices of emails to exclude (comma-separated): ",Color.GREEN))
+            indices = [int(i) for i in selected.split(',')]
+            if any(i >= len(all_emails) or i < 0 for i in indices):
+                log_error("Invalid indices entered.")
+                return
+            selected_emails = [email for i, email in enumerate(all_emails) if i not in indices]
+            break
+        elif choice == '4':
+            n = int(input(color_text("Enter the number of emails to send to: ",Color.GREEN)))
+            selected_emails = all_emails[:n]
+            break
+        elif choice == '5':
+            n = int(input(color_text("Enter the number of emails to exclude: ",Color.GREEN)))
+            selected_emails = all_emails[n:]
+            break
+        elif choice == '6':
+            n = int(input(color_text("Enter the number of emails to send to: ",Color.GREEN)))
+            selected_emails = all_emails[-n:]
+            break
+        elif choice == '7':
+            n = int(input(color_text("Enter the number of emails to send to: ")))
+            selected_emails = random.sample(all_emails, n)
+            break
+        elif choice == '0':
             return
-        selected_emails = [all_emails[i] for i in indices]
-    elif choice == '2':
-        selected = input("Enter indices of emails to exclude (comma-separated): ")
-        indices = [int(i) for i in selected.split(',')]
-        if any(i >= len(all_emails) or i < 0 for i in indices):
-            log_error("Invalid indices entered.")
-            return
-        selected_emails = [email for i, email in enumerate(all_emails) if i not in indices]
-    elif choice == '3':
-        n = int(input("Enter the number of emails to send to: "))
-        selected_emails = all_emails[:n]
-    elif choice == '4':
-        n = int(input("Enter the number of emails to exclude: "))
-        selected_emails = all_emails[n:]
-    elif choice == '5':
-        n = int(input("Enter the number of emails to send to: "))
-        selected_emails = all_emails[-n:]
-    elif choice == '6':
-        n = int(input("Enter the number of emails to send to: "))
-        selected_emails = random.sample(all_emails, n)
-    elif choice == '-1':
-        return
-    else:
-        print("Invalid choice. Please try again.")
-        return
+        else:
+            color_print("\nInvalid choice. Please try again.",Color.YELLOW)
+            
     
     # Send to subset
     with smtplib.SMTP(SMTP_SERVER, 587) as smtp:
@@ -260,35 +290,37 @@ def send_to_subset():
         smtp.login(EMAIL, PASSWORD)
 
         # Choose a text file to send as the email body
-        choice = input("Do you want to send a custom message (enter 0) or a file (enter 1)?: ")
-        if choice == '0':
-            message = input("Enter your message: ")
-            msg = MIMEText(message)
-        elif choice == '1':
-            filename = input("Enter the name of the file to send as the email body (email_body.txt): ")
-            with open(filename, "r") as file:
-                msg = MIMEText(file.read())
-        else:
-            log_error("Invalid choice. Please try again.")
+        while True:
+            option = input(color_text("Do you want to send a custom message (enter 0) or a file (enter 1)?: ",Color.GREEN))
+            if option == '0':
+                message = input(color_text("Enter your message: ",Color.GREEN))
+                msg = MIMEText(message)
+                break
+            elif option == '1':
+                filename = input(color_text("Enter the name of the file to send as the email body (email_body.txt): ",Color.GREEN))
+                with open(filename, "r") as file:
+                    msg = MIMEText(file.read())
+                break
+            else:
+                color_print("\nInvalid choice. Please try again.",Color.YELLOW)
        
         
-        subject = input("Enter the subject of the email: ")
+        subject = input(color_text("Enter the subject of the email: ",Color.GREEN))
         msg["Subject"] = subject
         msg["From"] = EMAIL
 
         for email in selected_emails:    
             msg["To"] = email
-            print(f"Sending email to {email}")
             if MODE == 0:
-                print(f"Development Mode: Sending {msg}\n")
+                print(f"\nDevelopment Mode - Sending: \n{msg}\n")
             else:
                 smtp.sendmail(EMAIL, email, msg.as_string())
-            if choice == '0':
+            if option == '0':
                 log_info(f"Email with custom message sent to {email}")
-            elif choice == '1':
+            elif option == '1':
                 log_info(f"Email from file {filename} sent to {email}")
     
-    print("Emails sent successfully!")
+    log_info("Emails sent successfully!")
 
 
 
@@ -298,42 +330,50 @@ def main():
             process_new_emails()
             return
         
-        print("--------------- Welcome to AutoMailtion ---------------")
+        color_print("\n--------------- Welcome to AutoMailtion ---------------\n",Color.PURPLE)
         if MODE == 0: 
-            print("Running in Development Mode")
+            color_print("Running in Development Mode",Color.YELLOW)
         
         while True:
-            print("Please select an option:")
-            print("\tTo Process new emails please enter 1")
-            print("\tTo view stored emails please enter 2")
-            print("\tTo send to a subset of stored mail addresses please enter 3")
-            print("\tTo delete an email please enter 4")
-            print("\tTo delete all emails please enter 5")
-            print("\tTo add an email please enter 6")
-            print("\tTo update the last UID please enter 7")
-            print("\tTo exit the program please enter 0")
-            choice = input("Enter your choice: ")
+            color_print("\nPlease select an option:\n",Color.CYAN)
+            print(f"\tTo {color_text('process new emails',Color.CYAN)} please enter {color_text('1',Color.GREEN)}")
+            print(f"\tTo {color_text('view stored emails',Color.CYAN)} please enter {color_text('2',Color.GREEN)}")
+            print(f"\tTo {color_text('send to a subset',Color.CYAN)} of stored mail addresses please enter {color_text('3',Color.GREEN)}")
+            print(f"\tTo {color_text('delete',Color.CYAN)} an email please enter {color_text('4',Color.GREEN)}")
+            print(f"\tTo {color_text('delete all',Color.CYAN)} emails please enter {color_text('5',Color.GREEN)}")
+            print(f"\tTo {color_text('add',Color.CYAN)} an email please enter {color_text('6',Color.GREEN)}")
+            print(f"\tTo {color_text('update last UID',Color.CYAN)} please enter {color_text('7',Color.GREEN)}")
+            print(f"\tTo {color_text('exit',Color.CYAN)} the program please enter {color_text('0',Color.GREEN)}")
+            
+            choice = input(color_text("\nEnter your choice: ",Color.GREEN))
 
             if choice == '1':
                 process_new_emails()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '2':
                 view_stored_emails()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '3':
                 send_to_subset()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '4':
                 delete_email()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '5':
                 delete_all_emails()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '6':
                 add_email()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '7':
                 update_last_UID()
+                input(color_text("\nPress Enter to continue",Color.CYAN))
             elif choice == '0':
-                print("Exiting program. Goodbye!")
+                color_print("\n--------------- Exiting program. Goodbye! ---------------",Color.PURPLE)
                 log_info("Program exited.")
                 break
             else:
-                print("Invalid choice. Please try again.")
+                color_print("\nInvalid choice. Please try again.",Color.YELLOW)
     except Exception as e:
         log_error(f"An error occurred: {e}")
     finally:
