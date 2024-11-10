@@ -8,6 +8,8 @@ import os
 from dotenv import load_dotenv
 import random
 import logging
+import keyboard
+
 
 # Email and IMAP Configuration
 load_dotenv()
@@ -22,10 +24,10 @@ MODE_DESCRIPTION = {0: "Development", 1: "Manual", 2: "Automated"}
 current_mode = MODE_DESCRIPTION.get(MODE, "Unknown")
 
 # Last UID Configuration
-UID_FILE = "last_uid.txt"
+UID_FILE = os.path.join(os.path.dirname(__file__), "last_uid.txt")
 
 # Logging Configuration
-LOG_FILE = "history.log"
+LOG_FILE = os.path.join(os.path.dirname(__file__), "history.log")
 ENABLE_LOGGING = True
 
 logging.basicConfig(
@@ -47,7 +49,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER")
 
 # Database Configuration
 # SQLite setup for storing emails
-conn = sqlite3.connect('emails.db')
+conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "emails.db"))
 cursor = conn.cursor()
 cursor.execute("CREATE TABLE IF NOT EXISTS emails (email TEXT UNIQUE)")
 
@@ -282,8 +284,9 @@ def send_to_subset():
             return
         else:
             color_print("\nInvalid choice. Please try again.",Color.YELLOW)
-            
     
+    print(f"\nSelected Emails: {selected_emails}")
+
     # Send to subset
     with smtplib.SMTP(SMTP_SERVER, 587) as smtp:
         smtp.starttls()
@@ -291,10 +294,9 @@ def send_to_subset():
 
         # Choose a text file to send as the email body
         while True:
-            option = input(color_text("Do you want to send a custom message (enter 0) or a file (enter 1)?: ",Color.GREEN))
+            option = input(color_text("\nDo you want to send a custom message (enter 0) or a file (enter 1)?: ",Color.GREEN))
             if option == '0':
                 message = input(color_text("Enter your message: ",Color.GREEN))
-                msg = MIMEText(message)
                 break
             elif option == '1':
                 filename = input(color_text("Enter the name of the file to send as the email body (email_body.txt): ",Color.GREEN))
@@ -306,11 +308,22 @@ def send_to_subset():
        
         
         subject = input(color_text("Enter the subject of the email: ",Color.GREEN))
-        msg["Subject"] = subject
-        msg["From"] = EMAIL
+        
 
         for email in selected_emails:    
+            # Had to reacrete msg here to avoid "stacking" of emails
+            if option == '0':
+                msg = MIMEText(message)
+            elif option == '1':
+                with open(filename, "r") as file:
+                    msg = MIMEText(file.read())
+            else:
+                log_error("send_to_subset: Invalid option selected.")
+                return
+            msg["Subject"] = subject
+            msg["From"] = EMAIL
             msg["To"] = email
+            
             if MODE == 0:
                 print(f"\nDevelopment Mode - Sending: \n{msg}\n")
             else:
@@ -324,15 +337,16 @@ def send_to_subset():
 
 
 
-def main():
+def main(rec = False):
     try:
         if MODE == 2:
             process_new_emails()
             return
         
-        color_print("\n--------------- Welcome to AutoMailtion ---------------\n",Color.PURPLE)
-        if MODE == 0: 
-            color_print("Running in Development Mode",Color.YELLOW)
+        if not rec:
+            color_print("\n--------------- Welcome to AutoMailtion ---------------\n",Color.PURPLE)
+            if MODE == 0: 
+                color_print("Running in Development Mode",Color.YELLOW)
         
         while True:
             color_print("\nPlease select an option:\n",Color.CYAN)
@@ -384,3 +398,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+    
